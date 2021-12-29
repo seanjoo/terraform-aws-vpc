@@ -1,3 +1,34 @@
+#####
+# Generic SG for VPC endpoints
+#####
+resource "aws_security_group" "vpce_default_sg" {
+  count       = 1
+  name        = "default_vpce_sg"
+  description = "Allow https/443 from VPC cidr"
+  vpc_id      = local.vpc_id
+
+  ingress {
+    description      = "TLS from VPC"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = [var.cidr]
+  }
+
+  egress {
+    from_port        = 0
+    to_port          = 0
+    protocol         = "-1"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  tags = {
+    Name = "default_vpce_sg"
+  }
+}
+
+
 ######################
 # VPC Endpoint for S3
 ######################
@@ -42,11 +73,19 @@ resource "aws_vpc_endpoint_route_table_association" "intra_s3" {
   route_table_id  = element(aws_route_table.intra.*.id, 0)
 }
 
-resource "aws_vpc_endpoint_route_table_association" "public_s3" {
-  count = var.create_vpc && var.enable_s3_endpoint && var.enable_public_s3_endpoint && length(var.public_subnets) > 0 && var.s3_endpoint_type == "Gateway" ? 1 : 0
+resource "aws_vpc_endpoint_route_table_association" "firewall_s3" {
+  count = var.create_network_firewall && var.create_vpc && var.enable_s3_endpoint && length(var.firewall_subnets) > 0 && var.s3_endpoint_type == "Gateway" ? 1 : 0
 
   vpc_endpoint_id = aws_vpc_endpoint.s3[0].id
-  route_table_id  = aws_route_table.public[0].id
+  route_table_id  = element(aws_route_table.firewall.*.id, 0)
+}
+
+resource "aws_vpc_endpoint_route_table_association" "public_s3" {
+  count = var.create_vpc && var.enable_s3_endpoint && var.enable_public_s3_endpoint && length(var.public_subnets) > 0 && var.s3_endpoint_type == "Gateway" ? length(var.public_subnets)  : 0
+
+  vpc_endpoint_id = aws_vpc_endpoint.s3[0].id
+  route_table_id  = element(aws_route_table.public.*.id, count.index)
+
 }
 
 ############################
@@ -94,10 +133,10 @@ resource "aws_vpc_endpoint_route_table_association" "intra_dynamodb" {
 }
 
 resource "aws_vpc_endpoint_route_table_association" "public_dynamodb" {
-  count = var.create_vpc && var.enable_dynamodb_endpoint && length(var.public_subnets) > 0 && var.dynamodb_endpoint_type == "Gateway" ? 1 : 0
+  count = var.create_vpc && var.enable_dynamodb_endpoint && length(var.public_subnets) > 0 && var.dynamodb_endpoint_type == "Gateway" ? length(var.public_subnets) : 0
 
   vpc_endpoint_id = aws_vpc_endpoint.dynamodb[0].id
-  route_table_id  = aws_route_table.public[0].id
+  route_table_id  = element(aws_route_table.public.*.id, count.index)
 }
 
 
@@ -274,7 +313,7 @@ resource "aws_vpc_endpoint" "ssm" {
   service_name      = data.aws_vpc_endpoint_service.ssm[0].service_name
   vpc_endpoint_type = "Interface"
 
-  security_group_ids  = var.ssm_endpoint_security_group_ids
+  security_group_ids  = coalescelist(var.ssm_endpoint_security_group_ids, aws_security_group.vpce_default_sg.*.id)
   subnet_ids          = coalescelist(var.ssm_endpoint_subnet_ids, aws_subnet.private.*.id)
   private_dns_enabled = var.ssm_endpoint_private_dns_enabled
   tags                = local.vpce_tags
@@ -296,7 +335,7 @@ resource "aws_vpc_endpoint" "ssmmessages" {
   service_name      = data.aws_vpc_endpoint_service.ssmmessages[0].service_name
   vpc_endpoint_type = "Interface"
 
-  security_group_ids  = var.ssmmessages_endpoint_security_group_ids
+  security_group_ids  = coalescelist(var.ssmmessages_endpoint_security_group_ids, aws_security_group.vpce_default_sg.*.id)
   subnet_ids          = coalescelist(var.ssmmessages_endpoint_subnet_ids, aws_subnet.private.*.id)
   private_dns_enabled = var.ssmmessages_endpoint_private_dns_enabled
   tags                = local.vpce_tags
@@ -341,7 +380,7 @@ resource "aws_vpc_endpoint" "ec2messages" {
   service_name      = data.aws_vpc_endpoint_service.ec2messages[0].service_name
   vpc_endpoint_type = "Interface"
 
-  security_group_ids  = var.ec2messages_endpoint_security_group_ids
+  security_group_ids  = coalescelist(var.ec2messages_endpoint_security_group_ids, aws_security_group.vpce_default_sg.*.id)
   subnet_ids          = coalescelist(var.ec2messages_endpoint_subnet_ids, aws_subnet.private.*.id)
   private_dns_enabled = var.ec2messages_endpoint_private_dns_enabled
   tags                = local.vpce_tags

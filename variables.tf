@@ -4,6 +4,12 @@ variable "create_vpc" {
   default     = true
 }
 
+variable "create_network_firewall" {
+  description = "Controls if network firewall should be created"
+  type        = bool
+  default     = false  
+}
+
 variable "name" {
   description = "Name to be used on all the resources as identifier"
   type        = string
@@ -64,6 +70,12 @@ variable "intra_subnet_ipv6_prefixes" {
   default     = []
 }
 
+variable "firewall_subnet_ipv6_prefixes" {
+  description = "Assigns IPv6 intra subnet id based on the Amazon provided /56 prefix base 10 integer (0-256). Must be of equal length to the corresponding IPv4 subnet list"
+  type        = list(string)
+  default     = []
+}
+
 variable "assign_ipv6_address_on_creation" {
   description = "Assign IPv6 address on subnet, must be disabled to change IPv6 CIDRs. This is the IPv6 equivalent of map_public_ip_on_launch"
   type        = bool
@@ -112,6 +124,12 @@ variable "intra_subnet_assign_ipv6_address_on_creation" {
   default     = null
 }
 
+variable "firewall_subnet_assign_ipv6_address_on_creation" {
+  description = "Assign IPv6 address on firewall subnet, must be disabled to change IPv6 CIDRs. This is the IPv6 equivalent of map_public_ip_on_launch"
+  type        = bool
+  default     = null
+}
+
 variable "secondary_cidr_blocks" {
   description = "List of secondary CIDR blocks to associate with the VPC to extend the IP Address pool"
   type        = list(string)
@@ -146,6 +164,12 @@ variable "intra_subnet_suffix" {
   description = "Suffix to append to intra subnets name"
   type        = string
   default     = "intra"
+}
+
+variable "firewall_subnet_suffix" {
+  description = "Suffix to append to firewall subnets name"
+  type        = string
+  default     = "firewall"
 }
 
 variable "database_subnet_suffix" {
@@ -206,6 +230,12 @@ variable "intra_subnets" {
   description = "A list of intra subnets"
   type        = list(string)
   default     = []
+}
+
+variable "firewall_subnets" {
+  description = "A list of firewall subnets"
+  type        = list(string)
+  default     = []  
 }
 
 variable "create_database_subnet_route_table" {
@@ -2333,6 +2363,12 @@ variable "intra_route_table_tags" {
   default     = {}
 }
 
+variable "firewall_route_table_tags" {
+  description = "Additional tags for the firewall route tables"
+  type        = map(string)
+  default     = {}
+}
+
 variable "database_subnet_tags" {
   description = "Additional tags for the database subnets"
   type        = map(string)
@@ -2369,6 +2405,12 @@ variable "intra_subnet_tags" {
   default     = {}
 }
 
+variable "firewall_subnet_tags" {
+  description = "Additional tags for the firewall subnets"
+  type        = map(string)
+  default     = {}
+}
+
 variable "public_acl_tags" {
   description = "Additional tags for the public subnets network ACL"
   type        = map(string)
@@ -2389,6 +2431,12 @@ variable "outpost_acl_tags" {
 
 variable "intra_acl_tags" {
   description = "Additional tags for the intra subnets network ACL"
+  type        = map(string)
+  default     = {}
+}
+
+variable "firewall_acl_tags" {
+  description = "Additional tags for the firewall subnets network ACL"
   type        = map(string)
   default     = {}
 }
@@ -2573,6 +2621,12 @@ variable "intra_dedicated_network_acl" {
   default     = false
 }
 
+variable "firewall_dedicated_network_acl" {
+  description = "Whether to use dedicated network ACL (not default) and custom rules for firewall subnets"
+  type        = bool
+  default     = false
+}
+
 variable "database_dedicated_network_acl" {
   description = "Whether to use dedicated network ACL (not default) and custom rules for database subnets"
   type        = bool
@@ -2753,6 +2807,38 @@ variable "intra_inbound_acl_rules" {
 
 variable "intra_outbound_acl_rules" {
   description = "Intra subnets outbound network ACLs"
+  type        = list(map(string))
+
+  default = [
+    {
+      rule_number = 100
+      rule_action = "allow"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_block  = "0.0.0.0/0"
+    },
+  ]
+}
+
+variable "firewall_inbound_acl_rules" {
+  description = "Firewall subnets inbound network ACLs"
+  type        = list(map(string))
+
+  default = [
+    {
+      rule_number = 100
+      rule_action = "allow"
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_block  = "0.0.0.0/0"
+    },
+  ]
+}
+
+variable "firewall_outbound_acl_rules" {
+  description = "Firewall subnets outbound network ACLs"
   type        = list(map(string))
 
   default = [
@@ -2987,4 +3073,28 @@ variable "outpost_az" {
   description = "AZ where Outpost is anchored."
   type        = string
   default     = null
+}
+
+variable "fivetuple_stateful_rule_group" {
+  description = "Config for 5-tuple type stateful rule group"
+  type        = list(any)
+  default     = []
+}
+
+variable "domain_stateful_rule_group" {
+  description = "Config for domain type stateful rule group"
+  type        = list(any)
+  default     = []
+}
+
+variable "suricata_stateful_rule_group" {
+  description = "Config for Suricata type stateful rule group"
+  type        = list(any)
+  default     = []
+}
+
+variable "stateless_rule_group" {
+  description = "Config for stateless rule group"
+  type = list(any)
+  default = []
 }
